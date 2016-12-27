@@ -1,17 +1,22 @@
 from __future__ import absolute_import, unicode_literals
 
 import os
+import unittest
+import warnings
 
 from django import forms, template
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import reverse
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import six
 from mock import MagicMock
 from taggit.forms import TagField, TagWidget
 
 from wagtail.tests.testapp.models import CustomImage, CustomImageFilePath
 from wagtail.tests.utils import WagtailTestUtils
+from wagtail.utils.deprecation import RemovedInWagtail110Warning
+from wagtail.wagtailimages import get_image_model, get_image_model_string
 from wagtail.wagtailimages.fields import WagtailImageField
 from wagtail.wagtailimages.formats import Format, get_image_format, register_image_format
 from wagtail.wagtailimages.forms import get_image_form
@@ -20,6 +25,12 @@ from wagtail.wagtailimages.rect import Rect, Vector
 from wagtail.wagtailimages.views.serve import ServeView, generate_signature, verify_signature
 
 from .utils import Image, get_test_image_file
+
+try:
+    import sendfile  # noqa
+    sendfile_mod = True
+except:
+    sendfile_mod = False
 
 
 class TestImageTag(TestCase):
@@ -354,6 +365,36 @@ class TestFrontendServeView(TestCase):
         self.assertEqual(response.status_code, 410)
 
 
+class TestFrontendSendfileView(TestCase):
+
+    def setUp(self):
+        self.image = Image.objects.create(
+            title="Test image",
+            file=get_test_image_file(),
+        )
+
+    @override_settings(SENDFILE_BACKEND='sendfile.backends.development')
+    @unittest.skipIf(not sendfile_mod, 'Missing django-sendfile app.')
+    def test_sendfile_nobackend(self):
+        signature = generate_signature(self.image.id, 'fill-800x600')
+        response = self.client.get(reverse('wagtailimages_sendfile',
+                                           args=(signature, self.image.id,
+                                                 'fill-800x600')))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/png')
+
+    @override_settings(SENDFILE_BACKEND='sendfile.backends.development')
+    def test_sendfile_dummy_backend(self):
+        signature = generate_signature(self.image.id, 'fill-800x600')
+        response = self.client.get(reverse('wagtailimages_sendfile_dummy',
+                                           args=(signature, self.image.id,
+                                                 'fill-800x600')))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content, 'Dummy backend response')
+
+
 class TestRect(TestCase):
     def test_init(self):
         rect = Rect(100, 150, 200, 250)
@@ -543,3 +584,49 @@ class TestDifferentUpload(TestCase):
         # The files should be uploaded based on it's content, not just
         # it's filename
         self.assertFalse(image.file.url == second_image.file.url)
+
+
+class TestGetImageModel(WagtailTestUtils, TestCase):
+    @override_settings(WAGTAILIMAGES_IMAGE_MODEL='tests.CustomImage')
+    def test_custom_get_image_model(self):
+        """Test get_image_model with a custom image model"""
+        self.assertIs(get_image_model(), CustomImage)
+
+    @override_settings(WAGTAILIMAGES_IMAGE_MODEL='tests.CustomImage')
+    def test_custom_get_image_model_string(self):
+        """Test get_image_model_string with a custom image model"""
+        self.assertEqual(get_image_model_string(), 'tests.CustomImage')
+
+    @override_settings()
+    def test_standard_get_image_model(self):
+        """Test get_image_model with no WAGTAILIMAGES_IMAGE_MODEL"""
+        del settings.WAGTAILIMAGES_IMAGE_MODEL
+        from wagtail.wagtailimages.models import Image
+        self.assertIs(get_image_model(), Image)
+
+    @override_settings()
+    def test_standard_get_image_model_string(self):
+        """Test get_image_model_STRING with no WAGTAILIMAGES_IMAGE_MODEL"""
+        del settings.WAGTAILIMAGES_IMAGE_MODEL
+        self.assertEqual(get_image_model_string(), 'wagtailimages.Image')
+
+    @override_settings(WAGTAILIMAGES_IMAGE_MODEL='tests.UnknownModel')
+    def test_unknown_get_image_model(self):
+        """Test get_image_model with an unknown model"""
+        with self.assertRaises(ImproperlyConfigured):
+            get_image_model()
+
+    @override_settings(WAGTAILIMAGES_IMAGE_MODEL='invalid-string')
+    def test_invalid_get_image_model(self):
+        """Test get_image_model with an invalid model string"""
+        with self.assertRaises(ImproperlyConfigured):
+            get_image_model()
+
+    def test_deprecated_get_image_model(self):
+        from wagtail.wagtailimages.models import get_image_model
+        with warnings.catch_warnings(record=True) as ws:
+            warnings.simplefilter('always')
+
+            self.assertIs(Image, get_image_model())
+            self.assertEqual(len(ws), 1)
+            self.assertIs(ws[0].category, RemovedInWagtail110Warning)

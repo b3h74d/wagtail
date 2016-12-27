@@ -1,6 +1,6 @@
-==========================================
-Wagtail 1.5 release notes - IN DEVELOPMENT
-==========================================
+=========================
+Wagtail 1.5 release notes
+=========================
 
 .. contents::
     :local:
@@ -10,10 +10,40 @@ Wagtail 1.5 release notes - IN DEVELOPMENT
 What's new
 ==========
 
+Reorganised page explorer actions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_static/images/releasenotes_1_5_explorermenu.png
+
+The action buttons on the page explorer have been reorganised to reduce clutter, and lesser-used actions have been moved to a "More" dropdown. A new hook :ref:`register_page_listing_buttons` has been added for adding custom action buttons to the page explorer.
+
 ModelAdmin
 ~~~~~~~~~~
 
-Wagtail now includes an app ``wagtail.contrib.modeladmin`` (previously available separately as the `wagtailmodeladmin <https://github.com/rkhleics/wagtailmodeladmin>`_ package) which allows you to configure arbitrary Django models to be listed, added and edited through the Wagtail admin. See :doc:`/reference/contrib/modeladmin` for full documentation. This feature was developed by Andy Babic.
+Wagtail now includes an app ``wagtail.contrib.modeladmin`` (previously available separately as the `wagtailmodeladmin <https://github.com/rkhleics/wagtailmodeladmin>`_ package) which allows you to configure arbitrary Django models to be listed, added and edited through the Wagtail admin.
+
+.. image:: ../_static/images/releasenotes_1_5_modeladmin.png
+
+
+See :doc:`/reference/contrib/modeladmin/index` for full documentation. This feature was developed by Andy Babic.
+
+
+TableBlock
+~~~~~~~~~~
+
+``TableBlock``, a new StreamField block type for editing table-based content, is now available through the ``wagtail.contrib.table_block`` module.
+
+.. image:: ../_static/images/screen40_table_block.png
+
+See :doc:`/reference/contrib/table_block` for documentation. This feature was developed by Moritz Pfeiffer, David Seddon and Brad Busenius.
+
+
+Improved link handling in rich text
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_static/images/releasenotes_1_5_unlink.gif
+
+The user experience around inserting, editing and removing links inside rich text areas has been greatly improved: link destinations are shown as tooltips, and existing links can be edited as well as unlinked. This feature was developed by Loic Teixeira.
 
 
 Improvements to the "Image serve view"
@@ -23,16 +53,16 @@ Improvements to the "Image serve view"
 
 This view, which is used for requesting image thumbnails from an external app, has had some improvements made to it in this release.
 
- - A "redirect" action has been added which will redirect the user to where the resized image is hosted rather than serving it from the app. This may be beneficial for performance if the images are hosted externally (eg, S3)
+ - A :ref:`"redirect" action <image_serve_view_redirect_action>` has been added which will redirect the user to where the resized image is hosted rather than serving it from the app. This may be beneficial for performance if the images are hosted externally (eg, S3)
  - It now takes an optional extra path component which can be used for appending a filename to the end of the URL
  - The key is now configurable on the view so you don't have to use your project's ``SECRET_KEY``
  - It's been refactored into a class based view and you can now create multiple serve views with different image models and/or keys
+ - It now supports :ref:`serving image files using django-sendfile <image_serve_view_sendfile>` (Thanks to Yannick Chabbert for implementing this)
 
 Minor features
 ~~~~~~~~~~~~~~
 
- * Moved lesser-user actions in the page explorer into a 'More' dropdown
- * Added a hook :ref:`register_page_listing_buttons` for adding action buttons to the page explorer
+ * Password reset email now reminds the user of their username (Matt Westcott)
  * Added :ref:`jinja2 support <settings_tag_jinja2>` for the  ``settings`` template tag (Tim Heap)
  * Added 'revisions' action to pages list (Roel Bruggink)
  * Added a hook :ref:`insert_global_admin_js` for inserting custom JavaScript throughout the admin backend (Tom Dyson)
@@ -51,6 +81,13 @@ Minor features
  * Improved L10N and I18N for revisions list (Roel Bruggink)
  * The multiple image uploader now displays details of server errors (Nigel Fletton)
  * Added ``WAGTAIL_APPEND_SLASH`` setting to determine whether page URLs end in a trailing slash - see :ref:`append_slash` (Andrew Tork Baker)
+ * Added auto resizing text field, richtext field, and snippet chooser to styleguide (Liam Brenner)
+ * Support field widget media inside ``StreamBlock`` blocks (Karl Hobley)
+ * Spinner was added to Save button on site settings (Liam Brenner)
+ * Added success message after logout from Admin (Liam Brenner)
+ * Added ``get_upload_to`` method to ``AbstractRendition`` which, when overridden, allows control over where image renditions are stored (Rob Moggach and Matt Westcott)
+ * Added a mechanism to customise the add / edit user forms for custom user models - see :doc:`/advanced_topics/customisation/custom_user_models` (Nigel Fletton)
+ * Added internal provision for swapping in alternative rich text editors (Karl Hobley)
 
 Bug fixes
 ~~~~~~~~~
@@ -62,12 +99,24 @@ Bug fixes
  * Failures on sending moderation notification emails now produce a warning, rather than crashing the admin page outright (Matt Fozard)
  * All admin forms that could potentially include file upload fields now specify ``multipart/form-data`` where appropriate (Tim Heap)
  * REM units in Wagtailuserbar caused incorrect spacing (Vincent Audebert)
- * Now user can upload images / documents only into permitted collection from choosers
  * Explorer menu no longer scrolls with page content (Vincent Audebert)
+ * ``decorate_urlpatterns`` now uses ``functools.update_wrapper`` to keep view names and docstrings (Mario César)
+ * StreamField block controls are no longer hidden by the StreamField menu when prepending a new block (Vincent Audebert)
+ * Removed invalid use of ``__`` alias that prevented strings getting picked up for translation (Juha Yrjölä)
+ * :ref:`Routable pages <routable_page_mixin>` without a main view no longer raise a ``TypeError`` (Bojan Mihelac)
+ * Fixed UnicodeEncodeError in wagtailforms when downloading a CSV for a form containing non-ASCII field labels on Python 2 (Mikalai Radchuk)
+ * Server errors during search indexing on creating / updating / deleting a model are now logged, rather than causing the overall operation to fail (Karl Hobley)
+ * Objects are now correctly removed from search indexes on deletion (Karl Hobley)
 
 
 Upgrade considerations
 ======================
+
+Buttons in admin now require ``class="button"``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Wagtail admin CSS has been refactored for maintainability, and buttons now require an explicit ``button`` class. (Previously, the styles were applied on all inputs of type ``"submit"``, ``"reset"`` or ``"button"``.) If you have created any apps that extend the Wagtail admin with new views / templates, you will need to add this class to all buttons.
+
 
 The ``search_fields`` attribute on models should now be set to a list
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

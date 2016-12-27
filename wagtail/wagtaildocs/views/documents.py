@@ -8,12 +8,13 @@ from django.views.decorators.vary import vary_on_headers
 from wagtail.utils.pagination import paginate
 from wagtail.wagtailadmin import messages
 from wagtail.wagtailadmin.forms import SearchForm
-from wagtail.wagtailadmin.utils import PermissionPolicyChecker, permission_denied
+from wagtail.wagtailadmin.utils import (
+    PermissionPolicyChecker, permission_denied, popular_tags_for_model)
 from wagtail.wagtailcore.models import Collection
 from wagtail.wagtaildocs.forms import get_document_form
 from wagtail.wagtaildocs.models import get_document_model
 from wagtail.wagtaildocs.permissions import permission_policy
-from wagtail.wagtailsearch.backends import get_search_backends
+from wagtail.wagtailsearch import index as search_index
 
 permission_checker = PermissionPolicyChecker(permission_policy)
 
@@ -80,7 +81,7 @@ def index(request):
             'is_searching': bool(query_string),
 
             'search_form': form,
-            'popular_tags': Document.popular_tags(),
+            'popular_tags': popular_tags_for_model(Document),
             'user_can_add': permission_policy.user_has_permission(request.user, 'add'),
             'collections': collections,
             'current_collection': current_collection,
@@ -99,8 +100,7 @@ def add(request):
             form.save()
 
             # Reindex the document to make sure all tags are indexed
-            for backend in get_search_backends():
-                backend.add(doc)
+            search_index.insert_or_update_object(doc)
 
             messages.success(request, _("Document '{0}' added.").format(doc.title), buttons=[
                 messages.button(reverse('wagtaildocs:edit', args=(doc.id,)), _('Edit'))
@@ -138,8 +138,7 @@ def edit(request, document_id):
             doc = form.save()
 
             # Reindex the document to make sure all tags are indexed
-            for backend in get_search_backends():
-                backend.add(doc)
+            search_index.insert_or_update_object(doc)
 
             messages.success(request, _("Document '{0}' updated").format(doc.title), buttons=[
                 messages.button(reverse('wagtaildocs:edit', args=(doc.id,)), _('Edit'))

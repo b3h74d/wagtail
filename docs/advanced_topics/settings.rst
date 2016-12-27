@@ -178,19 +178,29 @@ Search
 
 .. code-block:: python
 
-  # Override the search results template for wagtailsearch
+  WAGTAILSEARCH_BACKENDS = {
+      'default': {
+          'BACKEND': 'wagtail.wagtailsearch.backends.elasticsearch2',
+          'INDEX': 'myapp'
+      }
+  }
+
+Define a search backend. For a full explanation, see :ref:`wagtailsearch_backends`.
+
+.. code-block:: python
+
   WAGTAILSEARCH_RESULTS_TEMPLATE = 'myapp/search_results.html'
   WAGTAILSEARCH_RESULTS_TEMPLATE_AJAX = 'myapp/includes/search_listing.html'
 
-  # Replace the search backend
-  WAGTAILSEARCH_BACKENDS = {
-    'default': {
-      'BACKEND': 'wagtail.wagtailsearch.backends.elasticsearch',
-      'INDEX': 'myapp'
-    }
-  }
+Override the templates used by the search front-end views.
 
-The search settings customise the search results templates as well as choosing a custom backend for search. For a full explanation, see :ref:`search`.
+.. _wagtailsearch_hits_max_age:
+
+.. code-block:: python
+
+  WAGTAILSEARCH_HITS_MAX_AGE = 14
+
+Set the number of days (default 7) that search query logs are kept for; these are used to identify popular search terms for :ref:`promoted search results <editors-picks>`. Queries older than this will be removed by the :ref:`search_garbage_collect` command.
 
 
 Embeds
@@ -215,9 +225,9 @@ Providing an API key for the Embedly service will use that as a embed backend, w
 
 To use Embedly, you must also install their Python module:
 
-.. code-block:: sh
+.. code-block:: console
 
-  pip install embedly
+  $ pip install embedly
 
 
 Images
@@ -228,6 +238,16 @@ Images
   WAGTAILIMAGES_IMAGE_MODEL = 'myapp.MyImage'
 
 This setting lets you provide your own image model for use in Wagtail, which might extend the built-in ``AbstractImage`` class or replace it entirely.
+
+
+Maximum Upload size for Images
+------------------------------
+
+.. code-block:: python
+
+    WAGTAILIMAGES_MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # i.e. 20MB
+
+This setting lets you override the maximum upload size for images (in bytes). If omitted, Wagtail will fall back to using its 10MB default value.
 
 
 Password Management
@@ -297,6 +317,52 @@ Case-Insensitive Tags
 
 Tags are case-sensitive by default ('music' and 'Music' are treated as distinct tags). In many cases the reverse behaviour is preferable.
 
+Unicode Page Slugs
+------------------
+
+.. code-block:: python
+
+  WAGTAIL_ALLOW_UNICODE_SLUGS = True
+
+By default, page slugs can contain any alphanumeric characters, including non-Latin alphabets (except on Django 1.8, where only ASCII characters are supported). Set this to False to limit slugs to ASCII characters.
+
+Custom User Edit Forms
+----------------------
+
+See :doc:`/advanced_topics/customisation/custom_user_models`.
+
+.. code-block:: python
+
+  WAGTAIL_USER_EDIT_FORM = 'users.forms.CustomUserEditForm'
+
+Allows the default ``UserEditForm`` class to be overridden with a custom form when
+a custom user model is being used and extra fields are required in the user edit form.
+
+.. code-block:: python
+
+  WAGTAIL_USER_CREATION_FORM = 'users.forms.CustomUserCreationForm'
+
+Allows the default ``UserCreationForm`` class to be overridden with a custom form when
+a custom user model is being used and extra fields are required in the user creation form.
+
+.. code-block:: python
+
+  WAGTAIL_USER_CUSTOM_FIELDS = ['country']
+
+A list of the extra custom fields to be appended to the default list.
+
+Usage for images, documents and snippets
+----------------------------------------
+
+.. code-block:: python
+
+    WAGTAIL_USAGE_COUNT_ENABLED = True
+
+When enabled Wagtail shows where a particular image, document or snippet is being used on your site (disabled by default). A link will appear on the edit page showing you which pages they have been used on.
+
+.. note::
+
+    The usage count only applies to direct (database) references. Using documents, images and snippets within StreamFields or rich text fields will not be taken into account.
 
 URL Patterns
 ~~~~~~~~~~~~
@@ -311,18 +377,18 @@ URL Patterns
   from wagtail.wagtailsearch import urls as wagtailsearch_urls
 
   urlpatterns = [
-    url(r'^django-admin/', include(admin.site.urls)),
+      url(r'^django-admin/', include(admin.site.urls)),
 
-    url(r'^admin/', include(wagtailadmin_urls)),
-    url(r'^search/', include(wagtailsearch_urls)),
-    url(r'^documents/', include(wagtaildocs_urls)),
+      url(r'^admin/', include(wagtailadmin_urls)),
+      url(r'^search/', include(wagtailsearch_urls)),
+      url(r'^documents/', include(wagtaildocs_urls)),
 
-    # Optional URL for including your own vanilla Django urls/views
-    url(r'', include('myapp.urls')),
+      # Optional URL for including your own vanilla Django urls/views
+      url(r'', include('myapp.urls')),
 
-    # For anything not caught by a more specific rule above, hand over to
-    # Wagtail's serving mechanism
-    url(r'', include(wagtail_urls)),
+      # For anything not caught by a more specific rule above, hand over to
+      # Wagtail's serving mechanism
+      url(r'', include(wagtail_urls)),
   ]
 
 This block of code for your project's ``urls.py`` does a few things:
@@ -358,29 +424,28 @@ These two files should reside in your project directory (``myproject/myproject/`
   # Application definition
 
   INSTALLED_APPS = [
+      'myapp',
 
-    'myapp',
+      'wagtail.wagtailforms',
+      'wagtail.wagtailredirects',
+      'wagtail.wagtailembeds',
+      'wagtail.wagtailsites',
+      'wagtail.wagtailusers',
+      'wagtail.wagtailsnippets',
+      'wagtail.wagtaildocs',
+      'wagtail.wagtailimages',
+      'wagtail.wagtailsearch',
+      'wagtail.wagtailadmin',
+      'wagtail.wagtailcore',
 
-    'wagtail.wagtailforms',
-    'wagtail.wagtailredirects',
-    'wagtail.wagtailembeds',
-    'wagtail.wagtailsites',
-    'wagtail.wagtailusers',
-    'wagtail.wagtailsnippets',
-    'wagtail.wagtaildocs',
-    'wagtail.wagtailimages',
-    'wagtail.wagtailsearch',
-    'wagtail.wagtailadmin',
-    'wagtail.wagtailcore',
+      'taggit',
+      'modelcluster',
 
-    'taggit',
-    'modelcluster',
-
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+      'django.contrib.auth',
+      'django.contrib.contenttypes',
+      'django.contrib.sessions',
+      'django.contrib.messages',
+      'django.contrib.staticfiles',
   ]
 
 
@@ -419,7 +484,6 @@ These two files should reside in your project directory (``myproject/myproject/`
   ]
 
   WSGI_APPLICATION = 'wagtaildemo.wsgi.application'
-
 
   # Database
 
@@ -524,7 +588,7 @@ These two files should reside in your project directory (``myproject/myproject/`
   # Replace the search backend
   #WAGTAILSEARCH_BACKENDS = {
   #  'default': {
-  #    'BACKEND': 'wagtail.wagtailsearch.backends.elasticsearch',
+  #    'BACKEND': 'wagtail.wagtailsearch.backends.elasticsearch2',
   #    'INDEX': 'myapp'
   #  }
   #}
@@ -558,7 +622,7 @@ These two files should reside in your project directory (``myproject/myproject/`
   from wagtail.wagtailcore import urls as wagtail_urls
   from wagtail.wagtailadmin import urls as wagtailadmin_urls
   from wagtail.wagtaildocs import urls as wagtaildocs_urls
-  from wagtail.wagtailsearch import urls as wagtailsearch__urls
+  from wagtail.wagtailsearch import urls as wagtailsearch_urls
 
 
   urlpatterns = patterns('',

@@ -1,12 +1,12 @@
 from __future__ import absolute_import, unicode_literals
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.test import TestCase
 
 from wagtail.tests.testapp.models import BusinessIndex
 from wagtail.tests.utils import WagtailTestUtils
-from wagtail.wagtailcore.models import Page
+from wagtail.wagtailcore.models import GroupPagePermission, Page
 
 
 class TestIndexView(TestCase, WagtailTestUtils):
@@ -56,6 +56,27 @@ class TestIndexView(TestCase, WagtailTestUtils):
 
         # There should still be four results
         self.assertEqual(response.context['result_count'], 4)
+
+
+class TestExcludeFromExplorer(TestCase, WagtailTestUtils):
+    fixtures = ['modeladmintest_test.json']
+
+    def setUp(self):
+        self.login()
+
+    def test_attribute_effects_explorer(self):
+        # The two VenuePages should appear in the venuepage list
+        response = self.client.get('/admin/modeladmintest/venuepage/')
+        self.assertContains(response, "Santa&#39;s Grotto")
+        self.assertContains(response, "Santa&#39;s Workshop")
+
+        # But when viewing the children of 'Christmas' event in explorer
+        response = self.client.get('/admin/pages/4/')
+        self.assertNotContains(response, "Santa&#39;s Grotto")
+        self.assertNotContains(response, "Santa&#39;s Workshop")
+
+        # But the other test page should...
+        self.assertContains(response, "Claim your free present!")
 
 
 class TestCreateView(TestCase, WagtailTestUtils):
@@ -179,6 +200,46 @@ class TestChooseParentView(TestCase, WagtailTestUtils):
         expected_path = '/admin/pages/add/tests/eventpage/2/'
         expected_next_path = '/admin/tests/eventpage/'
         self.assertRedirects(response, '%s?next=%s' % (expected_path, expected_next_path))
+
+
+class TestChooseParentViewForNonSuperuser(TestCase, WagtailTestUtils):
+    fixtures = ['test_specific.json']
+
+    def setUp(self):
+        homepage = Page.objects.get(url_path='/home/')
+        business_index = BusinessIndex(title='Public Business Index')
+        homepage.add_child(instance=business_index)
+
+        another_business_index = BusinessIndex(title='Another Business Index')
+        homepage.add_child(instance=another_business_index)
+
+        secret_business_index = BusinessIndex(title='Private Business Index')
+        homepage.add_child(instance=secret_business_index)
+
+        business_editors = Group.objects.create(name='Business editors')
+        business_editors.permissions.add(Permission.objects.get(codename='access_admin'))
+        GroupPagePermission.objects.create(
+            group=business_editors,
+            page=business_index,
+            permission_type='add'
+        )
+        GroupPagePermission.objects.create(
+            group=business_editors,
+            page=another_business_index,
+            permission_type='add'
+        )
+
+        user = get_user_model().objects._create_user(username='test2', email='test2@email.com', password='password', is_staff=True, is_superuser=False)
+        user.groups.add(business_editors)
+        # Login
+        self.client.login(username='test2', password='password')
+
+    def test_simple(self):
+        response = self.client.get('/admin/tests/businesschild/choose_parent/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Public Business Index')
+        self.assertNotContains(response, 'Private Business Index')
 
 
 class TestEditorAccess(TestCase):
